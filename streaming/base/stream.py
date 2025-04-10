@@ -164,6 +164,7 @@ class Stream:
             self.safe_keep_zip = self.keep_zip or self.remote in {None, self.local}
 
         self._downloader = CloudDownloader.get(remote)
+        self._downloader.set_account_info(remote)
 
     def _get_temporary_directory(self) -> str:
         """Construct a path to a temporary directory based on remote and split."""

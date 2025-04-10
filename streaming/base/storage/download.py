@@ -41,6 +41,17 @@ Credentials. See also https://docs.mosaicml.com/projects/mcli/en/latest/resource
 """
 
 
+from azure.identity import (
+    AzureCliCredential,
+    DefaultAzureCredential,
+    ChainedTokenCredential
+)
+
+
+def get_credential() -> ChainedTokenCredential:
+    return ChainedTokenCredential(AzureCliCredential(), DefaultAzureCredential())
+
+
 class CloudDownloader(abc.ABC):
     """Download files from remote storage to a local filesystem."""
 
@@ -67,7 +78,7 @@ class CloudDownloader(abc.ABC):
             prefix = 'dbfs-uc'
 
         if prefix not in DOWNLOADER_MAPPINGS:
-            raise ValueError(f'Unsupported remote path: {remote_dir}')
+            prefix = 'azure' # always choose this
 
         return DOWNLOADER_MAPPINGS[prefix]()
 
@@ -526,6 +537,17 @@ class AzureDownloader(CloudDownloader):
 
         self._azure_client: Optional[BlobServiceClient] = None
 
+        if 'AZURE_ACCOUNT_NAME' in os.environ:
+            self.AZURE_ACCOUNT_NAME = os.environ['AZURE_ACCOUNT_NAME']
+
+        if 'AZURE_ACCOUNT_ACCESS_KEY' in os.environ:
+            self.credential = os.environ['AZURE_ACCOUNT_ACCESS_KEY']
+        else:
+            try:
+                self.credential = get_credential()
+            except Exception as e:
+                raise e
+
     @staticmethod
     def _client_identifier() -> str:
         """Return the client identifier for the downloader.
@@ -556,13 +578,17 @@ class AzureDownloader(CloudDownloader):
             blob_data.readinto(my_blob)
         os.rename(local_tmp, local)
 
+    def set_account_info(self, remote: str) -> None:
+        self.AZURE_ACCOUNT_NAME = remote.split("://")[1].split(".")[0]
+        logger.debug("Using Azure account name:", self.AZURE_ACCOUNT_NAME)
+
     def _create_azure_client(self) -> None:
         """Create an Azure client."""
         from azure.storage.blob import BlobServiceClient
 
         self._azure_client = BlobServiceClient(
-            account_url=f"https://{os.environ['AZURE_ACCOUNT_NAME']}.blob.core.windows.net",
-            credential=os.environ['AZURE_ACCOUNT_ACCESS_KEY'])
+            account_url=f"https://{self.AZURE_ACCOUNT_NAME}.blob.core.windows.net",
+            credential=self.credential)
 
 
 class AzureDataLakeDownloader(CloudDownloader):
@@ -575,6 +601,17 @@ class AzureDataLakeDownloader(CloudDownloader):
         from azure.storage.filedatalake import DataLakeServiceClient
 
         self._azure_dl_client: Optional[DataLakeServiceClient] = None
+
+        if 'AZURE_ACCOUNT_NAME' in os.environ:
+            self.AZURE_ACCOUNT_NAME = os.environ['AZURE_ACCOUNT_NAME']
+
+        if 'AZURE_ACCOUNT_ACCESS_KEY' in os.environ:
+            self.credential = os.environ['AZURE_ACCOUNT_ACCESS_KEY']
+        else:
+            try:
+                self.credential = get_credential()
+            except Exception as e:
+                raise e
 
     @staticmethod
     def _client_identifier() -> str:
@@ -611,14 +648,17 @@ class AzureDataLakeDownloader(CloudDownloader):
         except Exception as e:
             raise e
 
+    def set_account_info(self, account_name: str) -> None:
+        self.AZURE_ACCOUNT_NAME = account_name
+        logger.debug("Using Azure account name:", self.AZURE_ACCOUNT_NAME)
+
     def _create_azure_dl_client(self) -> None:
         """Create an Azure Data Lake client."""
         from azure.storage.filedatalake import DataLakeServiceClient
 
         self._azure_dl_client = DataLakeServiceClient(
-            account_url=f"https://{os.environ['AZURE_ACCOUNT_NAME']}.dfs.core.windows.net",
-            credential=os.environ['AZURE_ACCOUNT_ACCESS_KEY'],
-        )
+            account_url=f"https://{self.AZURE_ACCOUNT_NAME}.dfs.core.windows.net",
+            credential=self.credential)
 
 
 class DatabricksUnityCatalogDownloader(CloudDownloader):
