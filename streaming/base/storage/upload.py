@@ -48,6 +48,7 @@ UPLOADERS = {
 }
 
 
+# For managed identities on Azure
 from azure.identity import (
     AzureCliCredential,
     DefaultAzureCredential,
@@ -749,7 +750,7 @@ class AzureUploader(CloudUploader):
 
         # Create a session and use it to make our client. Unlike Resources and Sessions,
         # clients are generally thread-safe.
-        self._azure_client = BlobServiceClient(
+        self.azure_service  = BlobServiceClient(
             account_url=f"https://{self.AZURE_ACCOUNT_NAME}.blob.core.windows.net",
             credential=self.credential)
         self.check_bucket_exists(self.remote)  # pyright: ignore
@@ -849,7 +850,7 @@ class AzureDataLakeUploader(CloudUploader):
     
         # Create a session and use it to make our client. Unlike Resources and Sessions,
         # clients are generally thread-safe.
-        self._azure_dl_client = DataLakeServiceClient(
+        self.azure_service = DataLakeServiceClient(
             account_url=f"https://{self.AZURE_ACCOUNT_NAME}.dfs.core.windows.net",
             credential=self.credential)
         self.check_container_exists(self.remote)  # pyright: ignore

@@ -41,6 +41,7 @@ Credentials. See also https://docs.mosaicml.com/projects/mcli/en/latest/resource
 """
 
 
+# For managed identities on Azure
 from azure.identity import (
     AzureCliCredential,
     DefaultAzureCredential,
